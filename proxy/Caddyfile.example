@@ -1,0 +1,8 @@
+{$CLICKHOUSE_PUBLIC_HOST} {
+    encode zstd gzip
+
+    @nonPost not method POST
+    respond @nonPost 405
+
+    reverse_proxy clickhouse:8123
+}

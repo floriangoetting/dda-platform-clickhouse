@@ -1,0 +1,20 @@
+name: Validate deployment kit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate files and Compose configuration
+        run: ./scripts/validate.sh
+      - name: Test ClickHouse bootstrap and roles
+        run: ./scripts/smoke-test.sh

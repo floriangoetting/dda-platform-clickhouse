@@ -1,0 +1,22 @@
+<VirtualHost *:80>
+    ServerName clickhouse.example.com
+    Redirect permanent / https://clickhouse.example.com/
+</VirtualHost>
+<VirtualHost *:443>
+    ServerName clickhouse.example.com
+
+    SSLEngine on
+    SSLCertificateFile /path/to/fullchain.pem
+    SSLCertificateKeyFile /path/to/private-key.pem
+
+    LimitRequestBody 10485760
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:18123/ connectiontimeout=5 timeout=30
+    ProxyPassReverse / http://127.0.0.1:18123/
+
+    <Location />
+        <LimitExcept POST>
+            Require all denied
+        </LimitExcept>
+    </Location>
+</VirtualHost>

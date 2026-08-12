@@ -1,0 +1,52 @@
+name: dda-platform-clickhouse
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:?Set CLICKHOUSE_ADMIN_USER in .env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?Set CLICKHOUSE_ADMIN_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      DDA_PLATFORM_WRITER_PASSWORD: ${DDA_PLATFORM_WRITER_PASSWORD:?Set DDA_PLATFORM_WRITER_PASSWORD in .env}
+      DDA_EXPLORER_READER_PASSWORD: ${DDA_EXPLORER_READER_PASSWORD:?Set DDA_EXPLORER_READER_PASSWORD in .env}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./initdb/bootstrap.sh:/docker-entrypoint-initdb.d/20-dda-platform.sh:ro
+    expose:
+      - "8123"
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_HTTP_PORT:-18123}:8123"
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  caddy:
+    profiles:
+      - standalone-caddy
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_PUBLIC_HOST: ${CLICKHOUSE_PUBLIC_HOST:?Set CLICKHOUSE_PUBLIC_HOST in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./proxy/Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:
+  caddy_data:
+  caddy_config:
