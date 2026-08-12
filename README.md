@@ -120,7 +120,10 @@ Writer and reader passwords must differ. Rotate credentials deliberately in Clic
 
 ## Data contract
 
-The table implements `dda_native_v1`. It contains stable Platform scope and delivery metadata, mapped core event fields, and the complete accepted event as canonical JSON in `event_json`.
+The table implements `dda_native_v1`. It contains stable Platform scope and
+delivery metadata, the internal project-schema ID and producer-selected schema
+version, mapped core event fields, and the schema-allowlisted event as canonical
+JSON in `event_json`. Unknown fields are discarded by DDA before delivery.
 
 The bootstrap is idempotent for a new volume, but it is not a schema migration system. Future contract changes will be published as repository releases with explicit upgrade notes. Pin production deployments to a reviewed tag or commit instead of following the default branch automatically.
 

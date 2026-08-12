@@ -40,8 +40,8 @@ dda_received_at
 organization_id
 project_id
 environment_id
-tracking_contract_key
-tracking_contract_version
+event_schema_id
+event_schema_version
 event_name
 event_type
 event_id
