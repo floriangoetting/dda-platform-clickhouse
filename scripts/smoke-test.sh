@@ -39,7 +39,16 @@ compose exec -T clickhouse clickhouse-client \
 compose exec -T clickhouse clickhouse-client \
   --user dda_platform_writer \
   --password "$DDA_PLATFORM_WRITER_PASSWORD" \
-  --query "INSERT INTO analytics.events VALUES (1, '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', now64(3), 1, 1, 1, 'smoke', 1, 'smoke_test', NULL, 'external-1', now64(3), 'client-1', 'session-1', '{}')"
+  --query "INSERT INTO analytics.events
+    (dda_schema_version, dda_event_id, dda_batch_id, dda_received_at,
+     organization_id, project_id, environment_id, event_schema_id,
+     event_schema_version, event_name, event_type, event_id, event_time,
+     client_id, session_id, event_json)
+    VALUES
+    (1, '00000000-0000-4000-8000-000000000001',
+     '00000000-0000-4000-8000-000000000002', now64(3),
+     1, 1, 1, 1, 1, 'smoke_test', NULL, 'external-1', now64(3),
+     'client-1', 'session-1', '{}')"
 
 row_count=$(compose exec -T clickhouse clickhouse-client \
   --user dda_explorer_reader \
