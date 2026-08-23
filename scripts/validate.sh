@@ -7,6 +7,7 @@ cd "$repository_root"
 required_files="
 .env.example
 compose.yaml
+config.d/resource-conscious-logging.xml
 initdb/bootstrap.sh
 proxy/Caddyfile.example
 proxy/nginx.conf.example
@@ -31,6 +32,21 @@ if grep -Eq 'image:[[:space:]]+[^#]*:latest([[:space:]]|$)' compose.yaml; then
   echo "Container images must not use the latest tag." >&2
   exit 1
 fi
+
+require_logging_setting() {
+  required_setting=$1
+  if ! grep -F "$required_setting" config.d/resource-conscious-logging.xml >/dev/null; then
+    echo "Resource-conscious ClickHouse logging setting is missing: $required_setting" >&2
+    exit 1
+  fi
+}
+
+require_logging_setting '<level>information</level>'
+require_logging_setting '<size>50M</size>'
+require_logging_setting '<count>3</count>'
+require_logging_setting '<ttl>event_date + INTERVAL 1 DAY DELETE</ttl>'
+require_logging_setting '<ttl>event_date + INTERVAL 7 DAY DELETE</ttl>'
+require_logging_setting '<collect_interval_milliseconds>10000</collect_interval_milliseconds>'
 
 required_columns="
 dda_schema_version

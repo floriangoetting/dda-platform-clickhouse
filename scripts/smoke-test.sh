@@ -30,6 +30,27 @@ until [ "$(compose ps --format json clickhouse | grep -c '"Health":"healthy"' ||
   sleep 5
 done
 
+assert_config_value() {
+  key=$1
+  expected=$2
+  actual=$(compose exec -T clickhouse clickhouse extract-from-config \
+    --config-file=/etc/clickhouse-server/config.xml \
+    --key="$key")
+
+  if [ "$actual" != "$expected" ]; then
+    echo "Unexpected ClickHouse config value for $key: $actual" >&2
+    exit 1
+  fi
+}
+
+assert_config_value logger.level information
+assert_config_value logger.size 50M
+assert_config_value logger.count 3
+assert_config_value trace_log.ttl "event_date + INTERVAL 1 DAY DELETE"
+assert_config_value query_log.ttl "event_date + INTERVAL 7 DAY DELETE"
+assert_config_value text_log.level information
+assert_config_value metric_log.collect_interval_milliseconds 10000
+
 compose exec -T clickhouse clickhouse-client \
   --user dda_platform_writer \
   --password "$DDA_PLATFORM_WRITER_PASSWORD" \

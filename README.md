@@ -41,6 +41,21 @@ docker compose logs --tail=100 clickhouse
 
 The bootstrap creates `analytics.events` and the two restricted users when the data volume is initialized for the first time.
 
+### Resource-conscious system logging
+
+The deployment mounts `config.d/resource-conscious-logging.xml` to keep
+ClickHouse diagnostics useful without allowing system logs to dominate a small
+destination host. It changes the server file log from `trace` to `information`,
+rotates it at 50 MB with three retained files, samples the metric log every ten
+seconds and applies short TTLs to high-volume `system.*_log` tables. Query and
+part logs remain available for seven days, errors for fourteen days and the
+highest-volume diagnostic logs for one to three days.
+
+These limits affect only ClickHouse diagnostic logs. They do not add a TTL to
+`analytics.events` or delete Platform event data. Operators that require a
+longer diagnostic history should export logs to their monitoring system or
+adapt the mounted configuration deliberately while retaining a bounded policy.
+
 ## Publish the HTTPS endpoint
 
 Choose exactly one reverse-proxy option.
@@ -137,6 +152,10 @@ Before production use, define and test:
 - ClickHouse and container-image upgrades
 - firewall policy and credential rotation
 - deletion procedures for privacy and retention requests
+
+The supplied system-log limits are operational defaults for the ClickHouse
+service itself. Product-event retention for `analytics.events` remains an
+explicit operator decision and is not configured by this kit.
 
 DDA can validate the destination contract and report delivery failures. It cannot manage the customer's server, DNS, backups, retention or network policy.
 
