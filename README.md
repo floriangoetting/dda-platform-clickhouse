@@ -1,11 +1,12 @@
-# DDA Platform ClickHouse
+# Drag & Drop Analytics Platform ClickHouse
 
 Versioned deployment kit for a customer-owned ClickHouse destination used by the Drag & Drop Analytics Platform.
 
-The kit creates the `dda_native_v1` event table and two purpose-specific database users:
+The kit creates one Environment-exclusive `dda_native_v2` event table and two
+table-specific database users:
 
-- `dda_platform_writer` for Platform delivery and connection tests
-- `dda_explorer_reader` for read-only Explorer access
+- the configured `DDA_PLATFORM_WRITER_USER` for Platform delivery and connection tests
+- the configured `DDA_EXPLORER_READER_USER` for read-only Explorer access
 
 Drag & Drop Analytics stores the destination credentials in encrypted form and delivers accepted events to this database. The ClickHouse server, storage, backups, retention, DNS, TLS, firewall rules and upgrades remain under the customer's control.
 
@@ -29,7 +30,9 @@ cd dda-platform-clickhouse
 cp .env.example .env
 ```
 
-Set `CLICKHOUSE_PUBLIC_HOST` and replace all three example passwords with independent random values. The `.env` file is ignored by Git.
+Set `CLICKHOUSE_PUBLIC_HOST`, choose an Environment-specific table and user names,
+and replace all three example passwords with independent random values. The `.env`
+file is ignored by Git. A table must be assigned to exactly one Platform Environment.
 
 Start ClickHouse:
 
@@ -39,7 +42,25 @@ docker compose ps
 docker compose logs --tail=100 clickhouse
 ```
 
-The bootstrap creates `analytics.events` and the two restricted users when the data volume is initialized for the first time.
+The bootstrap creates the configured database, Environment table, and its two
+restricted users when the data volume is initialized for the first time. The example
+uses `analytics.events_production`.
+
+### Add another Environment
+
+One ClickHouse instance can host multiple Environments, but every Environment needs
+its own table and table-specific users. Copy `.env.example` to a separate ignored file,
+retain the same ClickHouse connection settings, and set unique values for:
+
+- `DDA_CLICKHOUSE_EVENTS_TABLE`
+- `DDA_PLATFORM_WRITER_USER` and `DDA_PLATFORM_WRITER_PASSWORD`
+- `DDA_EXPLORER_READER_USER` and `DDA_EXPLORER_READER_PASSWORD`
+
+Provision it in the already running instance:
+
+```bash
+./scripts/provision-environment.sh .env.staging
+```
 
 ### Resource-conscious system logging
 
@@ -52,7 +73,7 @@ part logs remain available for seven days, errors for fourteen days and the
 highest-volume diagnostic logs for one to three days.
 
 These limits affect only ClickHouse diagnostic logs. They do not add a TTL to
-`analytics.events` or delete Platform event data. Operators that require a
+the configured Environment table or delete Platform event data. Operators that require a
 longer diagnostic history should export logs to their monitoring system or
 adapt the mounted configuration deliberately while retaining a bounded policy.
 
@@ -97,7 +118,7 @@ The following probe asks for the writer password interactively and validates the
 
 ```bash
 curl --fail --request POST \
-  --user dda_platform_writer \
+  --user dda_platform_writer_production \
   --data-binary 'SELECT 1' \
   https://clickhouse.example.com
 ```
@@ -108,37 +129,60 @@ Do not use `--insecure` for this check.
 
 Open the Platform project, select the environment, and configure its ClickHouse destination with these values:
 
-| DDA field | Value |
+| Drag & Drop Analytics field | Value |
 | --- | --- |
 | HTTPS endpoint | `https://clickhouse.example.com` |
 | Database | `analytics` |
-| Events table | `events` |
-| Writer username | `dda_platform_writer` |
+| Events table | value of `DDA_CLICKHOUSE_EVENTS_TABLE` |
+| Writer username | value of `DDA_PLATFORM_WRITER_USER` |
 | Writer password | `DDA_PLATFORM_WRITER_PASSWORD` from `.env` |
 | Explorer access | enable when the table should be available in Explorer |
-| Explorer username | `dda_explorer_reader` |
+| Explorer username | value of `DDA_EXPLORER_READER_USER` |
 | Explorer password | `DDA_EXPLORER_READER_PASSWORD` from `.env` |
 
-Run **Test connection** after saving. DDA verifies reachability, credentials, all `dda_native_v1` columns, the MergeTree deduplication contract and, when enabled, the separate Explorer reader.
+Run **Test connection** after saving. Drag & Drop Analytics verifies reachability,
+credentials, all `dda_native_v2` columns, the MergeTree deduplication contract and,
+when enabled, the separate Explorer reader. The application also rejects a v2 target
+that is already assigned to another Environment.
 
-Never enter the bootstrap admin account in DDA.
+Never enter the bootstrap admin account in Drag & Drop Analytics.
 
 ## Database roles
 
 | User | Intended use | Grants |
 | --- | --- | --- |
-| value of `CLICKHOUSE_ADMIN_USER` | bootstrap and maintenance | administrative; never store in DDA |
-| `dda_platform_writer` | Platform delivery and connection test | `INSERT` and contract-validation reads only |
-| `dda_explorer_reader` | Explorer queries | `SELECT` on `analytics.events` only |
+| value of `CLICKHOUSE_ADMIN_USER` | bootstrap and maintenance | administrative; never store in Drag & Drop Analytics |
+| value of `DDA_PLATFORM_WRITER_USER` | Platform delivery and connection test | `INSERT` and contract-validation reads on one Environment table only |
+| value of `DDA_EXPLORER_READER_USER` | Explorer queries | `SELECT` on one Environment table only |
 
-Writer and reader passwords must differ. Rotate credentials deliberately in ClickHouse and DDA; changing `.env` alone does not modify users in an existing data volume.
+Writer and reader passwords must differ. Rotate credentials deliberately in ClickHouse
+and Drag & Drop Analytics; changing `.env` alone does not modify users in an existing
+data volume.
 
 ## Data contract
 
-The table implements `dda_native_v1`. It contains stable Platform scope and
-delivery metadata, the internal project-schema ID and producer-selected schema
-version, mapped core event fields, and the schema-allowlisted event as canonical
-JSON in `event_json`. Unknown fields are discarded by DDA before delivery.
+The table implements `dda_native_v2`. Its physical table and table-specific grants
+are the Environment boundary, so event rows do not repeat internal Organization,
+project, Environment, schema-record, or batch IDs. Rows contain the contract version,
+stable technical event ID, receipt time, producer-selected event-schema version,
+mapped core event fields, and the schema-allowlisted event as canonical JSON in
+`event_json`. Unknown fields are discarded by Drag & Drop Analytics before delivery.
+
+### Migrate an existing `dda_native_v1` table
+
+Prepare an ignored target Environment file with a new table and new table-specific
+users. The migration helper provisions that v2 target and copies only the selected
+legacy Environment:
+
+```bash
+./scripts/migrate-v1-to-v2.sh analytics events 42 .env.production-v2
+```
+
+The target must be empty and different from the source. The helper compares row
+counts and leaves the v1 table untouched for rollback. After it succeeds, change the
+Environment destination in Drag & Drop Analytics to the new table, run the writer and
+Explorer tests, verify reports, and only then retire the old table under a separately
+approved retention procedure.
 
 The bootstrap is idempotent for a new volume, but it is not a schema migration system. Future contract changes will be published as repository releases with explicit upgrade notes. Pin production deployments to a reviewed tag or commit instead of following the default branch automatically.
 
@@ -154,10 +198,12 @@ Before production use, define and test:
 - deletion procedures for privacy and retention requests
 
 The supplied system-log limits are operational defaults for the ClickHouse
-service itself. Product-event retention for `analytics.events` remains an
+service itself. Product-event retention for each Environment table remains an
 explicit operator decision and is not configured by this kit.
 
-DDA can validate the destination contract and report delivery failures. It cannot manage the customer's server, DNS, backups, retention or network policy.
+Drag & Drop Analytics can validate the destination contract and report delivery
+failures. It cannot manage the customer's server, DNS, backups, retention or network
+policy.
 
 ## Validation
 

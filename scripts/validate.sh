@@ -9,6 +9,9 @@ required_files="
 compose.yaml
 config.d/resource-conscious-logging.xml
 initdb/bootstrap.sh
+initdb/provision-environment.sh
+scripts/provision-environment.sh
+scripts/migrate-v1-to-v2.sh
 proxy/Caddyfile.example
 proxy/nginx.conf.example
 proxy/apache-vhost.conf.example
@@ -22,6 +25,9 @@ for required_file in $required_files; do
 done
 
 sh -n initdb/bootstrap.sh
+sh -n initdb/provision-environment.sh
+sh -n scripts/provision-environment.sh
+sh -n scripts/migrate-v1-to-v2.sh
 sh -n scripts/validate.sh
 sh -n scripts/smoke-test.sh
 
@@ -51,12 +57,7 @@ require_logging_setting '<collect_interval_milliseconds>10000</collect_interval_
 required_columns="
 dda_schema_version
 dda_event_id
-dda_batch_id
 dda_received_at
-organization_id
-project_id
-environment_id
-event_schema_id
 event_schema_version
 event_name
 event_type
@@ -68,8 +69,15 @@ event_json
 "
 
 for required_column in $required_columns; do
-  if ! grep -Eq "^[[:space:]]+$required_column[[:space:]]" initdb/bootstrap.sh; then
-    echo "dda_native_v1 column missing from bootstrap: $required_column" >&2
+  if ! grep -Eq "^[[:space:]]+$required_column[[:space:]]" initdb/provision-environment.sh; then
+    echo "dda_native_v2 column missing from provisioner: $required_column" >&2
+    exit 1
+  fi
+done
+
+for removed_column in dda_batch_id organization_id project_id environment_id event_schema_id; do
+  if grep -Eq "^[[:space:]]+$removed_column[[:space:]]" initdb/provision-environment.sh; then
+    echo "Legacy scope column remains in dda_native_v2: $removed_column" >&2
     exit 1
   fi
 done
