@@ -2,7 +2,7 @@
 
 Versioned deployment kit for a customer-owned ClickHouse destination used by the Drag & Drop Analytics Platform.
 
-The kit creates one Environment-exclusive `dda_native_v2` event table and two
+The kit creates one Environment-exclusive `dda_native_v3` event table and two
 table-specific database users:
 
 - the configured `DDA_PLATFORM_WRITER_USER` for Platform delivery and connection tests
@@ -141,8 +141,8 @@ Open the Platform project, select the environment, and configure its ClickHouse 
 | Explorer password | `DDA_EXPLORER_READER_PASSWORD` from `.env` |
 
 Run **Test connection** after saving. Drag & Drop Analytics verifies reachability,
-credentials, all `dda_native_v2` columns, the MergeTree deduplication contract and,
-when enabled, the separate Explorer reader. The application also rejects a v2 target
+credentials, all `dda_native_v3` columns, the MergeTree deduplication contract and,
+when enabled, the separate Explorer reader. The application also rejects a v3 target
 that is already assigned to another Environment.
 
 Never enter the bootstrap admin account in Drag & Drop Analytics.
@@ -161,28 +161,28 @@ data volume.
 
 ## Data contract
 
-The table implements `dda_native_v2`. Its physical table and table-specific grants
+The table implements `dda_native_v3`. Its physical table and table-specific grants
 are the Environment boundary, so event rows do not repeat internal Organization,
 project, Environment, schema-record, or batch IDs. Rows contain the contract version,
 stable technical event ID, receipt time, producer-selected event-schema version,
 mapped core event fields, and the schema-allowlisted event as canonical JSON in
 `event_json`. Unknown fields are discarded by Drag & Drop Analytics before delivery.
 
-### Migrate an existing `dda_native_v1` table
+### Replace a previous Native table
 
-Prepare an ignored target Environment file with a new table and new table-specific
-users. The migration helper provisions that v2 target and copies only the selected
-legacy Environment:
+The v3 identity contract requires a new, empty Environment table. Provision it
+with a new table name and dedicated users, point the DDA destination to it, test
+writer and reader, and publish a schema mapping Device ID and optional User ID.
+Existing Platform reports may require recreation. Do not copy old rows into v3:
+they do not contain the internal profile references. Keep old tables separately
+until their owner deliberately retires them. The historical v1-to-v2 migration
+helper must be used only from its matching older kit release.
 
-```bash
-./scripts/migrate-v1-to-v2.sh analytics events 42 .env.production-v2
-```
-
-The target must be empty and different from the source. The helper compares row
-counts and leaves the v1 table untouched for rollback. After it succeeds, change the
-Environment destination in Drag & Drop Analytics to the new table, run the writer and
-Explorer tests, verify reports, and only then retire the old table under a separately
-approved retention procedure.
+Device ID is a browser/app context (including short-lived contexts); User ID is
+an optional external account ID. `profile_id` and `user_profile_id` are opaque
+DDA-generated references. The reader resolves anonymous history through delivered
+login evidence; an internal profile can exist without an external User ID.
+Sessions can be supplied or calculated from event times in the Reader settings.
 
 The bootstrap is idempotent for a new volume, but it is not a schema migration system. Future contract changes will be published as repository releases with explicit upgrade notes. Pin production deployments to a reviewed tag or commit instead of following the default branch automatically.
 

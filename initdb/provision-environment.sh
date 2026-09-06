@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS \`$DDA_CLICKHOUSE_DATABASE\`.\`$DDA_CLICKHOUSE_EVENTS
   event_type Nullable(String),
   event_id Nullable(String),
   event_time Nullable(DateTime64(3, 'UTC')),
-  client_id Nullable(String),
+  device_id Nullable(String),
+  user_id Nullable(String),
+  profile_id Nullable(UUID),
+  user_profile_id Nullable(UUID),
   session_id Nullable(String),
   event_json String
 )
@@ -66,4 +69,4 @@ clickhouse_query --query "GRANT SELECT ON system.tables TO \`$DDA_PLATFORM_WRITE
 clickhouse_query --query "GRANT SHOW TABLES ON \`$DDA_CLICKHOUSE_DATABASE\`.* TO \`$DDA_PLATFORM_WRITER_USER\`"
 clickhouse_query --query "GRANT SELECT ON \`$DDA_CLICKHOUSE_DATABASE\`.\`$DDA_CLICKHOUSE_EVENTS_TABLE\` TO \`$DDA_EXPLORER_READER_USER\`"
 
-echo "Provisioned exclusive dda_native_v2 table $DDA_CLICKHOUSE_DATABASE.$DDA_CLICKHOUSE_EVENTS_TABLE."
+echo "Provisioned exclusive dda_native_v3 table $DDA_CLICKHOUSE_DATABASE.$DDA_CLICKHOUSE_EVENTS_TABLE."

@@ -63,21 +63,24 @@ event_name
 event_type
 event_id
 event_time
-client_id
+device_id
+user_id
+profile_id
+user_profile_id
 session_id
 event_json
 "
 
 for required_column in $required_columns; do
   if ! grep -Eq "^[[:space:]]+$required_column[[:space:]]" initdb/provision-environment.sh; then
-    echo "dda_native_v2 column missing from provisioner: $required_column" >&2
+    echo "dda_native_v3 column missing from provisioner: $required_column" >&2
     exit 1
   fi
 done
 
 for removed_column in dda_batch_id organization_id project_id environment_id event_schema_id; do
   if grep -Eq "^[[:space:]]+$removed_column[[:space:]]" initdb/provision-environment.sh; then
-    echo "Legacy scope column remains in dda_native_v2: $removed_column" >&2
+    echo "Legacy scope column remains in dda_native_v3: $removed_column" >&2
     exit 1
   fi
 done

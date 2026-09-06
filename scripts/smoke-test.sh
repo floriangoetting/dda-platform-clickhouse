@@ -16,6 +16,8 @@ trap cleanup EXIT INT TERM
 set -a
 . ./.env.example
 set +a
+# Tests use the container client; allocate a free host port beside running setups.
+export CLICKHOUSE_HTTP_PORT=0
 
 compose up -d clickhouse
 
@@ -63,9 +65,9 @@ compose exec -T clickhouse clickhouse-client \
   --query "INSERT INTO \`$DDA_CLICKHOUSE_DATABASE\`.\`$DDA_CLICKHOUSE_EVENTS_TABLE\`
     (dda_schema_version, dda_event_id, dda_received_at,
      event_schema_version, event_name, event_type, event_id, event_time,
-     client_id, session_id, event_json)
+     device_id, session_id, event_json)
     VALUES
-    (2, '00000000-0000-4000-8000-000000000001',
+    (3, '00000000-0000-4000-8000-000000000001',
      now64(3), 1, 'smoke_test', NULL, 'external-1', now64(3),
      'client-1', 'session-1', '{}')"
 
